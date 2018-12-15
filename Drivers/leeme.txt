@@ -1,0 +1,5 @@
+El paquete driver_pcm3712_ao_ehu contiene el driver de la tarjeta de salidas analógicas disponible en el sistema empotrado GEME. Nótese que, además de incluir este, se deberá:
+
+-	Configurar la escritura en la tarjeta mediante la sentencia en la tarea principal
+Initialize_PCM3712;
+-	Escribir la acción de control mediante la sentencia Write_ao_PCM3712 (Voltios).
