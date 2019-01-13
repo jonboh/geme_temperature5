@@ -42,6 +42,7 @@ procedure main is
 
    --Semaphores--
    ReachRefEvent: aliased Suspension_Object;
+   ChangeRefEvent: aliased Suspension_Object;
 
 -- Task Procedures --
    prev_control_signal: Float:=0.0;
@@ -57,7 +58,7 @@ procedure main is
       mockup_control.Heat(control_signal);
       prev_error := error;
       prev_control_signal := control_signal;
-      if error < Reference.Get*0.1 then
+      if error < Reference.Get*0.05 then
          if FlagRefReach.Get = 0.0 then
             Set_True(ReachRefEvent);
             FlagRefReach.Set(1.0);
@@ -70,21 +71,22 @@ procedure main is
      Temperature.Set(mockup_control.read_temp);
    end ReadTemp;
 
-   procedure IncreaseRef is
-   begin
-      FlagRefReach.Set(0.0);
-      Reference.Set(Reference.Get + 2.0);
-      Put("New Reference: ");Put(Reference.Get);Put_Line("");
-   end IncreaseRef;
-
-   procedure DecreaseRef is
-   begin
-      FlagRefReach.Set(0.0);
-      Reference.Set(Reference.Get - 2.0);
-      Put("New Reference: ");Put(Reference.Get);Put_Line("");
-   end DecreaseRef;
-
+   cKeyPress: Character;
    prev_time: Time:= Clock;
+   procedure ChangeRef is
+   begin
+      FlagRefReach.Set(0.0);
+      if cKeyPress = 'i' then
+         Reference.Set(Reference.Get + 2.0);
+         prev_time := Clock;
+      elsif cKeyPress = 'd' then
+         Reference.Set(Reference.Get - 2.0);
+         prev_time := Clock;
+      end if;
+
+      Put("New Reference: ");Put(Reference.Get);Put_Line("");
+   end ChangeRef;
+
    procedure ShowTemp is
    aux_time: Duration;
    begin
@@ -96,33 +98,34 @@ procedure main is
       aux_time := To_Duration(Clock - prev_time);
       Put("Time: ");
       Put_Line(Duration'Image(aux_time));
-      prev_time := Clock;
    end ShowTemp;
 
 -- Tasks --
-   T_Control: pertask_gen.Periodic_Task(1,55,2,500,ControlAlgo'Access);
-   T_ReadTemp: pertask_gen.Periodic_Task(2, 40, 2, 2000, ReadTemp'Access);
-   T_ReachRef: esptask_gen.Esporadic_Task(3, 50, 5, 500, ShowTemp'Access,ReachRefEvent'Access);
+   T_Control: pertask_gen.Periodic_Task(1,30,2,500,ControlAlgo'Access);
+   T_ReachRef: esptask_gen.Esporadic_Task(3, 25, 5, 500, ShowTemp'Access,ReachRefEvent'Access);
+   T_ReadTemp: pertask_gen.Periodic_Task(2, 20, 2, 2000, ReadTemp'Access);
+   T_ChangeRef: esptask_gen.Esporadic_Task(4, 15, 10, 10000, ChangeRef'Access,ChangeRefEvent'Access);
 
--- Anonymus Task for Keyboard --
+   -- Anonymus Task for Keyboard --
+
    -- Declaration --
    task T_KeyboardAttention is
-      pragma Priority(30);
+      pragma Priority(10);
    end T_KeyBoardAttention;
    -- Implementation --
    task body T_KeyboardAttention is
-      cKeyPress: Character;
    begin
       loop
          Get(cKeyPress);
          if cKeyPress = 'i' then
-	    IncreaseRef;
-         elsif cKeyPress = 'd' then
-	    DecreaseRef;
+            Set_True(ChangeRefEvent);
+	 elsif cKeyPress = 'd' then
+            Set_True(ChangeRefEvent);
          elsif cKeyPress = 'f' then
             ComienzoFin.Fin.Set_Finish;
             -- Allow Sporadic Task To continue to exit
             Set_True(ReachRefEvent);
+            Set_True(ChangeRefEvent);
          end if;
          exit when ComienzoFin.Fin.Get_Finish;
       end loop;
@@ -130,11 +133,10 @@ procedure main is
    end T_KeyboardAttention;
 
 begin
-   Put_Line("All Tasks Active");
    FlagRefReach.Set(0.0);
    Reference.Set(35.0);
    ComienzoFin.Comienzo.Set_Initial_Time(Clock+Seconds(3));
    delay until clock + seconds(1);
    ComienzoFin.Stop.Go;
-   Put_Line("Finish Parent");
+   Put_Line("All Tasks Active");
 end main;
