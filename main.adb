@@ -35,10 +35,49 @@ procedure main is
       end Set;
    end Shared_Float;
 
-   --Instantiate Shared Floats (protected objects)--
+   protected type Shared_Char is
+      function Get return Character;
+      procedure Set (New_Value:Character);
+      private
+      Data: Character;
+   end Shared_Char;
+   --Type Implementation-- Body
+   protected body Shared_Char is
+      function Get return Character is
+      begin
+         return Data;
+      end Get;
+      procedure Set(New_Value: Character) is
+      begin
+         Data:= New_Value;
+      end Set;
+   end Shared_Char;
+
+   protected type Shared_Time is
+      function Get return Time;
+      procedure Set (New_Value:Time);
+      private
+      Data: Time;
+   end Shared_Time;
+   --Type Implementation-- Body
+   protected body Shared_Time is
+      function Get return Time is
+      begin
+         return Data;
+      end Get;
+      procedure Set(New_Value: Time) is
+      begin
+         Data:= New_Value;
+      end Set;
+   end Shared_Time;
+
+   --Instantiate Shared Floats/Shared Char (protected objects)--
    Temperature: Shared_Float;
    Reference: Shared_Float;
    FlagRefReach: Shared_Float;
+   cKeyPress: Shared_Char;
+   Prot_Clock: Shared_Time;
+
 
    --Semaphores--
    ReachRefEvent: aliased Suspension_Object;
@@ -71,17 +110,16 @@ procedure main is
      Temperature.Set(mockup_control.read_temp);
    end ReadTemp;
 
-   cKeyPress: Character;
-   prev_time: Time:= Clock;
+   --prev_time: Time:= Clock;
    procedure ChangeRef is
    begin
       FlagRefReach.Set(0.0);
-      if cKeyPress = 'i' then
+      if cKeyPress.Get = 'i' then
          Reference.Set(Reference.Get + 2.0);
-         prev_time := Clock;
-      elsif cKeyPress = 'd' then
+         Prot_Clock.Set(Clock);
+      elsif cKeyPress.Get = 'd' then
          Reference.Set(Reference.Get - 2.0);
-         prev_time := Clock;
+         Prot_Clock.Set(Clock);
       end if;
 
       Put("New Reference: ");Put(Reference.Get);Put_Line("");
@@ -95,7 +133,7 @@ procedure main is
       Put("  Reference: ");
       Put(Reference.Get);
       Put_Line("");
-      aux_time := To_Duration(Clock - prev_time);
+      aux_time := To_Duration(Clock - Prot_Clock.Get);
       Put("Time: ");
       Put_Line(Duration'Image(aux_time));
    end ShowTemp;
@@ -114,14 +152,16 @@ procedure main is
    end T_KeyBoardAttention;
    -- Implementation --
    task body T_KeyboardAttention is
+      cKeyPress_aux:character;
    begin
       loop
-         Get(cKeyPress);
-         if cKeyPress = 'i' then
+         Get(cKeyPress_aux);
+         cKeyPress.Set(cKeyPress_aux);
+         if cKeyPress.Get = 'i' then
             Set_True(ChangeRefEvent);
-	 elsif cKeyPress = 'd' then
+	 elsif cKeyPress.Get = 'd' then
             Set_True(ChangeRefEvent);
-         elsif cKeyPress = 'f' then
+         elsif cKeyPress.Get = 'f' then
             ComienzoFin.Fin.Set_Finish;
             -- Allow Sporadic Task To continue to exit
             Set_True(ReachRefEvent);
@@ -135,6 +175,7 @@ procedure main is
 begin
    FlagRefReach.Set(0.0);
    Reference.Set(35.0);
+   Prot_Clock.Set(Clock);
    ComienzoFin.Comienzo.Set_Initial_Time(Clock+Seconds(3));
    delay until clock + seconds(1);
    ComienzoFin.Stop.Go;
